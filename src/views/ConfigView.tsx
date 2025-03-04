@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import "./ConfigView.css";
 
 interface ConfigViewProps {
   onGenerateConfig: () => Promise<string | null>;

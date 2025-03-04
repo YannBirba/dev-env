@@ -1,4 +1,5 @@
 import React from "react";
+import "./HomeView.css";
 
 interface Project {
   name: string;
