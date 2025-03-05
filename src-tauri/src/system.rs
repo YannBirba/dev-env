@@ -78,115 +78,53 @@ pub fn get_docker_compose_dir() -> Result<PathBuf, String> {
     Ok(docker_dir)
 }
 
-// Check if container engine is running
-pub fn is_docker_running(container_engine: &str) -> Result<bool, String> {
-    match container_engine {
-        "docker" => {
-            #[cfg(target_os = "windows")]
-            {
-                let output = Command::new("cmd")
-                    .args(["/C", "docker info"])
-                    .output()
-                    .map_err(|e| format!("Failed to check Docker status: {}", e))?;
-
-                Ok(output.status.success())
-            }
-
-            #[cfg(not(target_os = "windows"))]
-            {
-                let output = Command::new("sh")
-                    .args(["-c", "docker info >/dev/null 2>&1"])
-                    .status()
-                    .map_err(|e| format!("Failed to check Docker status: {}", e))?;
-
-                Ok(output.success())
-            }
-        }
-        "nerdctl" => {
-            #[cfg(target_os = "windows")]
-            {
-                let output = Command::new("cmd")
-                    .args(["/C", "nerdctl info"])
-                    .output()
-                    .map_err(|e| format!("Failed to check containerd status: {}", e))?;
-
-                Ok(output.status.success())
-            }
-
-            #[cfg(not(target_os = "windows"))]
-            {
-                let output = Command::new("sh")
-                    .args(["-c", "nerdctl info >/dev/null 2>&1"])
-                    .status()
-                    .map_err(|e| format!("Failed to check containerd status: {}", e))?;
-
-                Ok(output.success())
-            }
-        }
-        _ => Err("Unsupported container engine specified".to_string()),
+// Check if Docker is running
+pub fn is_docker_running() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("cmd")
+            .args(["/C", "docker info"])
+            .output()
+            .map_err(|e| format!("Failed to check Docker status: {}", e))?;
+        Ok(output.status.success())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let output = Command::new("sh")
+            .args(["-c", "docker info >/dev/null 2>&1"])
+            .status()
+            .map_err(|e| format!("Failed to check Docker status: {}", e))?;
+        Ok(output.success())
     }
 }
 
 // Check if environment is running
-pub fn is_environment_running(container_engine: &str) -> Result<bool, String> {
+pub fn is_environment_running() -> Result<bool, String> {
     let docker_compose_path = get_docker_compose_dir()?.join("docker-compose.yml");
 
     if !docker_compose_path.exists() {
         return Ok(false);
     }
 
-    match container_engine {
-        "docker" => {
-            #[cfg(target_os = "windows")]
-            {
-                let output = Command::new("cmd")
-                    .args(["/C", "docker-compose ps -q"])
-                    .current_dir(get_docker_compose_dir()?)
-                    .output()
-                    .map_err(|e| format!("Failed to check environment status: {}", e))?;
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("cmd")
+            .args(["/C", "docker-compose ps -q"])
+            .current_dir(get_docker_compose_dir()?)
+            .output()
+            .map_err(|e| format!("Failed to check environment status: {}", e))?;
 
-                Ok(!output.stdout.is_empty())
-            }
+        Ok(!output.stdout.is_empty())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let output = Command::new("sh")
+            .args(["-c", "docker-compose ps -q"])
+            .current_dir(get_docker_compose_dir()?)
+            .output()
+            .map_err(|e| format!("Failed to check environment status: {}", e))?;
 
-            #[cfg(not(target_os = "windows"))]
-            {
-                let output = Command::new("sh")
-                    .args(["-c", "docker-compose ps -q"])
-                    .current_dir(get_docker_compose_dir()?)
-                    .output()
-                    .map_err(|e| format!("Failed to check environment status: {}", e))?;
-
-                Ok(!output.stdout.is_empty())
-            }
-        }
-        "nerdctl" => {
-            #[cfg(target_os = "windows")]
-            {
-                let output = Command::new("cmd")
-                    .args(["/C", "nerdctl compose ps -q"])
-                    .current_dir(get_docker_compose_dir()?)
-                    .output()
-                    .map_err(|e| {
-                        format!("Failed to check environment status with nerdctl: {}", e)
-                    })?;
-
-                Ok(!output.stdout.is_empty())
-            }
-
-            #[cfg(not(target_os = "windows"))]
-            {
-                let output = Command::new("sh")
-                    .args(["-c", "nerdctl compose ps -q"])
-                    .current_dir(get_docker_compose_dir()?)
-                    .output()
-                    .map_err(|e| {
-                        format!("Failed to check environment status with nerdctl: {}", e)
-                    })?;
-
-                Ok(!output.stdout.is_empty())
-            }
-        }
-        _ => Err("Unsupported container engine specified".to_string()),
+        Ok(!output.stdout.is_empty())
     }
 }
 
@@ -359,31 +297,19 @@ pub fn is_docker_installed() -> Result<bool, String> {
     Ok(output.status.success())
 }
 
-pub fn restart_environment(container_engine: &str) -> Result<(), String> {
+pub fn restart_environment(_: &str) -> Result<(), String> {
     let docker_compose_dir = get_docker_compose_dir()?;
 
     // Stop the environment first
-    let (stop_cmd, stop_args) = match container_engine {
-        "docker" => ("docker-compose", vec!["down"]),
-        "nerdctl" => ("nerdctl", vec!["compose", "down"]),
-        _ => return Err("Unsupported container engine".to_string()),
-    };
-
-    std::process::Command::new(stop_cmd)
-        .args(&stop_args)
+    std::process::Command::new("docker-compose")
+        .args(["down"])
         .current_dir(&docker_compose_dir)
         .output()
         .map_err(|e| format!("Failed to stop environment: {}", e))?;
 
     // Start the environment
-    let (start_cmd, start_args) = match container_engine {
-        "docker" => ("docker-compose", vec!["up", "-d"]),
-        "nerdctl" => ("nerdctl", vec!["compose", "up", "-d"]),
-        _ => return Err("Unsupported container engine".to_string()),
-    };
-
-    std::process::Command::new(start_cmd)
-        .args(&start_args)
+    std::process::Command::new("docker-compose")
+        .args(["up", "-d"])
         .current_dir(&docker_compose_dir)
         .output()
         .map_err(|e| format!("Failed to start environment: {}", e))?;

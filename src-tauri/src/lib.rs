@@ -9,14 +9,12 @@ fn add_project(
 ) -> Result<(), String> {
     let mut app_state = state.0.lock().unwrap();
     let slug = system::normalize_slug(&name);
-
     if app_state.projects.contains_key(&slug) {
         return Err(format!("Project with name '{}' already exists", name));
     }
 
     // Créer le dossier du projet et fichier index.php par défaut
     system::create_project_dir(&name)?;
-
     // Créer la configuration Nginx pour ce projet
     system::create_nginx_config(&name)?;
 
@@ -39,7 +37,6 @@ fn add_project(
 fn remove_project(state: tauri::State<'_, AppStateWrapper>, name: String) -> Result<(), String> {
     let mut app_state = state.0.lock().unwrap();
     let slug = system::normalize_slug(&name);
-
     if !app_state.projects.contains_key(&slug) {
         return Err(format!("Project '{}' does not exist", name));
     }
@@ -86,7 +83,6 @@ fn update_project(
 ) -> Result<(), String> {
     let mut app_state = state.0.lock().unwrap();
     let slug = system::normalize_slug(&name);
-
     if !app_state.projects.contains_key(&slug) {
         return Err(format!("Project '{}' does not exist", name));
     }
@@ -103,7 +99,6 @@ fn update_project(
 #[tauri::command]
 fn add_service(state: tauri::State<'_, AppStateWrapper>, service: Service) -> Result<(), String> {
     let mut app_state = state.0.lock().unwrap();
-
     if app_state.services.contains_key(&service.name) {
         return Err(format!(
             "Service with name '{}' already exists",
@@ -126,7 +121,6 @@ fn add_service(state: tauri::State<'_, AppStateWrapper>, service: Service) -> Re
 #[tauri::command]
 fn remove_service(state: tauri::State<'_, AppStateWrapper>, name: String) -> Result<(), String> {
     let mut app_state = state.0.lock().unwrap();
-
     if !app_state.services.contains_key(&name) {
         return Err(format!("Service '{}' does not exist", name));
     }
@@ -148,17 +142,7 @@ fn remove_service(state: tauri::State<'_, AppStateWrapper>, name: String) -> Res
     }
 
     // Stop and remove the container if it exists
-    let engine = app_state
-        .container_engine
-        .clone()
-        .unwrap_or_else(|| "docker".to_string());
-
-    let down_command = match engine.as_str() {
-        "docker" => format!("docker-compose stop {} && docker-compose rm -f {}", name, name),
-        "nerdctl" => format!("nerdctl compose stop {} && nerdctl compose rm -f {}", name, name),
-        _ => return Err("Unsupported container engine".to_string()),
-    };
-
+    let down_command = format!("docker-compose stop {} && docker-compose rm -f {}", name, name);
     let output = Command::new("sh")
         .args(["-c", &down_command])
         .current_dir(system::get_docker_compose_dir()?)
@@ -180,7 +164,6 @@ fn remove_service(state: tauri::State<'_, AppStateWrapper>, name: String) -> Res
     // Remove the service itself
     app_state.services.remove(&name);
     save_config(&app_state)?;
-
     Ok(())
 }
 
@@ -190,7 +173,6 @@ fn update_service(
     service: Service,
 ) -> Result<(), String> {
     let mut app_state = state.0.lock().unwrap();
-
     if !app_state.services.contains_key(&service.name) {
         return Err(format!("Service '{}' does not exist", service.name));
     }
@@ -241,7 +223,6 @@ fn add_service_to_project(
 ) -> Result<(), String> {
     let mut app_state = state.0.lock().unwrap();
     let slug = system::normalize_slug(&project_name);
-
     if !app_state.services.contains_key(&service_name) {
         return Err(format!("Service '{}' does not exist", service_name));
     }
@@ -265,7 +246,6 @@ fn remove_service_from_project(
 ) -> Result<(), String> {
     let mut app_state = state.0.lock().unwrap();
     let slug = system::normalize_slug(&project_name);
-
     if let Some(project) = app_state.projects.get_mut(&slug) {
         project.services.retain(|s| s != &service_name);
         save_config(&app_state)?;
@@ -286,50 +266,30 @@ fn save_docker_compose(content: String) -> Result<(), String> {
     let docker_compose_dir = system::get_docker_compose_dir()?;
     std::fs::create_dir_all(&docker_compose_dir)
         .map_err(|e| format!("Failed to create docker-compose directory: {}", e))?;
-
     let docker_compose_path = docker_compose_dir.join("docker-compose.yml");
     fs::write(docker_compose_path, content)
         .map_err(|e| format!("Failed to save docker-compose.yml: {}", e))
 }
 
 #[tauri::command]
-fn start_environment(state: tauri::State<'_, AppStateWrapper>) -> Result<String, String> {
-    let app_state = state.0.lock().unwrap();
-    let engine = app_state
-        .container_engine
-        .clone()
-        .unwrap_or_else(|| "docker".to_string());
-
+fn start_environment() -> Result<String, String> {
     let docker_compose_path = system::get_docker_compose_dir()?.join("docker-compose.yml");
-
+    
     if !docker_compose_path.exists() {
         return Err("Docker Compose file not found. Generate configuration first.".to_string());
     }
-
-    // Check if container engine is running
-    if !system::is_docker_running(&engine)? {
-        return Err(format!(
-            "{} is not running. Please start it first.",
-            if engine == "docker" {
-                "Docker"
-            } else {
-                "Containerd"
-            }
-        ));
+    
+    // Check if Docker is running
+    if !system::is_docker_running()? {
+        return Err("Docker is not running. Please start it first.".to_string());
     }
-
-    let (command, args) = match engine.as_str() {
-        "docker" => ("docker-compose", vec!["up", "-d"]),
-        "nerdctl" => ("nerdctl", vec!["compose", "up", "-d"]),
-        _ => return Err("Unsupported container engine".to_string()),
-    };
-
-    let output = Command::new(command)
+    
+    let output = Command::new("docker-compose")
         .current_dir(system::get_docker_compose_dir()?)
-        .args(args)
+        .args(["up", "-d"])
         .output()
         .map_err(|e| format!("Failed to start environment: {}", e))?;
-
+        
     if output.status.success() {
         Ok("Environment started successfully".to_string())
     } else {
@@ -339,31 +299,19 @@ fn start_environment(state: tauri::State<'_, AppStateWrapper>) -> Result<String,
 }
 
 #[tauri::command]
-fn stop_environment(state: tauri::State<'_, AppStateWrapper>) -> Result<String, String> {
-    let app_state = state.0.lock().unwrap();
-    let engine = app_state
-        .container_engine
-        .clone()
-        .unwrap_or_else(|| "docker".to_string());
-
+fn stop_environment() -> Result<String, String> {
     let docker_compose_path = system::get_docker_compose_dir()?.join("docker-compose.yml");
-
+    
     if !docker_compose_path.exists() {
         return Err("Docker Compose file not found. Generate configuration first.".to_string());
     }
-
-    let (command, args) = match engine.as_str() {
-        "docker" => ("docker-compose", vec!["down"]),
-        "nerdctl" => ("nerdctl", vec!["compose", "down"]),
-        _ => return Err("Unsupported container engine".to_string()),
-    };
-
-    let output = Command::new(command)
+    
+    let output = Command::new("docker-compose")
         .current_dir(system::get_docker_compose_dir()?)
-        .args(args)
+        .args(["down"])
         .output()
         .map_err(|e| format!("Failed to stop environment: {}", e))?;
-
+        
     if output.status.success() {
         Ok("Environment stopped successfully".to_string())
     } else {
@@ -373,23 +321,13 @@ fn stop_environment(state: tauri::State<'_, AppStateWrapper>) -> Result<String, 
 }
 
 #[tauri::command]
-fn check_docker_status(state: tauri::State<'_, AppStateWrapper>) -> Result<bool, String> {
-    let app_state = state.0.lock().unwrap();
-    let engine = app_state
-        .container_engine
-        .clone()
-        .unwrap_or_else(|| "docker".to_string());
-    system::is_docker_running(&engine)
+fn check_docker_status() -> Result<bool, String> {
+    system::is_docker_running()
 }
 
 #[tauri::command]
-fn check_environment_status(state: tauri::State<'_, AppStateWrapper>) -> Result<bool, String> {
-    let app_state = state.0.lock().unwrap();
-    let engine = app_state
-        .container_engine
-        .clone()
-        .unwrap_or_else(|| "docker".to_string());
-    system::is_environment_running(&engine)
+fn check_environment_status() -> Result<bool, String> {
+    system::is_environment_running()
 }
 
 #[tauri::command]
@@ -408,62 +346,29 @@ fn generate_traefik_config() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn get_container_engine(state: tauri::State<'_, AppStateWrapper>) -> String {
-    let app_state = state.0.lock().unwrap();
-    app_state
-        .container_engine
-        .clone()
-        .unwrap_or_else(|| "docker".to_string())
-}
-
-#[tauri::command]
-fn set_container_engine(
-    state: tauri::State<'_, AppStateWrapper>,
-    engine: String,
-) -> Result<(), String> {
-    if engine != "docker" && engine != "nerdctl" {
-        return Err(
-            "Unsupported container engine. Only 'docker' and 'nerdctl' are supported.".to_string(),
-        );
-    }
-
-    // Vérifier que le moteur de conteneurs est installé
-    let check_cmd = match engine.as_str() {
-        "docker" => "docker --version",
-        "nerdctl" => "nerdctl --version",
-        _ => unreachable!(),
-    };
-
-    let output = std::process::Command::new("sh")
-        .args(["-c", check_cmd])
-        .output()
-        .map_err(|_| format!("Failed to check if {} is installed", engine))?;
-
-    if !output.status.success() {
-        return Err(format!("{} is not installed or not in PATH", engine));
-    }
-
-    // Mettre à jour la configuration
-    let mut app_state = state.0.lock().unwrap();
-    app_state.container_engine = Some(engine);
-
-    // Synchroniser la constante CONTAINER_ENGINE avec la valeur choisie par l'utilisateur
-    // Note: Cette ligne est problématique car CONTAINER_ENGINE est une constante,
-    // nous devrons la traiter différemment dans l'implémentation réelle
-
-    save_config(&app_state)?;
-    Ok(())
-}
-
-#[tauri::command]
-fn check_config_exists() -> Result<bool, String> {
-    let docker_compose_path = system::get_docker_compose_dir()?.join("docker-compose.yml");
-    Ok(docker_compose_path.exists())
-}
-
-#[tauri::command]
 fn is_docker_installed() -> Result<bool, String> {
     system::is_docker_installed()
+}
+
+#[tauri::command]
+fn reset_config() -> Result<(), String> {
+    let config_dir = system::get_config_dir()?;
+    
+    // Supprimer le dossier de configuration
+    if config_dir.exists() {
+        std::fs::remove_dir_all(&config_dir)
+            .map_err(|e| format!("Failed to remove config directory: {}", e))?;
+    }
+    
+    // Recréer les dossiers nécessaires
+    std::fs::create_dir_all(&config_dir)
+        .map_err(|e| format!("Failed to create config directory: {}", e))?;
+        
+    let docker_dir = system::get_docker_compose_dir()?;
+    std::fs::create_dir_all(&docker_dir)
+        .map_err(|e| format!("Failed to create docker directory: {}", e))?;
+        
+    Ok(())
 }
 
 use serde::{Deserialize, Serialize};
@@ -471,7 +376,6 @@ use std::collections::HashMap;
 use std::fs;
 use std::process::Command;
 use std::sync::Mutex;
-use tauri::Manager;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Service {
@@ -629,28 +533,6 @@ fn add_predefined_service(
 
     app_state.services.insert(service.name.clone(), service);
     save_config(&app_state)?;
-
-    Ok(())
-}
-
-#[tauri::command]
-fn reset_config() -> Result<(), String> {
-    let config_dir = system::get_config_dir()?;
-
-    // Supprimer le dossier de configuration
-    if config_dir.exists() {
-        std::fs::remove_dir_all(&config_dir)
-            .map_err(|e| format!("Failed to remove config directory: {}", e))?;
-    }
-
-    // Recréer les dossiers nécessaires
-    std::fs::create_dir_all(&config_dir)
-        .map_err(|e| format!("Failed to create config directory: {}", e))?;
-
-    let docker_dir = system::get_docker_compose_dir()?;
-    std::fs::create_dir_all(&docker_dir)
-        .map_err(|e| format!("Failed to create docker directory: {}", e))?;
-
     Ok(())
 }
 
@@ -658,7 +540,6 @@ fn reset_config() -> Result<(), String> {
 pub struct AppState {
     services: HashMap<String, Service>,
     projects: HashMap<String, Project>,
-    container_engine: Option<String>,
 }
 
 const CONFIG_FILE: &str = "config.json";
@@ -683,6 +564,7 @@ fn load_config() -> Result<AppState, String> {
 
     let data = fs::read_to_string(&config_path)
         .map_err(|_| "No existing config, starting fresh".to_string())?;
+
     serde_json::from_str(&data).map_err(|e| format!("Failed to parse config file: {}", e))
 }
 
@@ -699,18 +581,6 @@ pub fn run() -> tauri::App {
     tauri::Builder::default()
         .plugin(tauri_plugin_localhost::Builder::new(1420).build())
         .manage(state_wrapper)
-        .setup(|app| {
-            if let Some(state) = app.try_state::<AppStateWrapper>() {
-                let _engine = state
-                    .0
-                    .lock()
-                    .unwrap()
-                    .container_engine
-                    .clone()
-                    .unwrap_or_else(|| "docker".to_string());
-            }
-            Ok(())
-        })
         .invoke_handler(tauri::generate_handler![
             add_project,
             remove_project,
@@ -733,8 +603,6 @@ pub fn run() -> tauri::App {
             setup_hosts_file,
             check_hosts_entries,
             generate_traefik_config,
-            get_container_engine,
-            set_container_engine,
             check_config_exists,
             list_predefined_services,
             add_predefined_service,
@@ -743,4 +611,10 @@ pub fn run() -> tauri::App {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
+}
+
+#[tauri::command]
+fn check_config_exists() -> Result<bool, String> {
+    let docker_compose_path = system::get_docker_compose_dir()?.join("docker-compose.yml");
+    Ok(docker_compose_path.exists())
 }

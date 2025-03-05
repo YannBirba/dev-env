@@ -5,7 +5,6 @@ use crate::AppState;
 
 pub fn generate_docker_compose(state: &AppState) -> Result<String, String> {
     let mut compose = YamlMap::new();
-    compose.insert(YamlValue::from("version"), YamlValue::from("3"));
 
     // Create services section
     let mut services = YamlMap::new();

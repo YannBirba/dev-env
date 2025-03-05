@@ -16,6 +16,7 @@ enum View {
 
 interface Project {
   name: string;
+  slug: string;
   services: string[];
   url: string;
   environment: Record<string, string>;
@@ -68,17 +69,17 @@ function App() {
         // Vérifier si Docker est installé
         const dockerInstalled = await invoke<boolean>("is_docker_installed");
         setIsDockerInstalled(dockerInstalled);
-
+        
         if (!dockerInstalled) {
           setCurrentView(View.Config);
-          setStatusMessage("Docker n'est pas installé. Veuillez l'installer pour continuer.");
+          setStatusMessage("Docker n'est pas installé sur votre système. Veuillez installer Docker pour utiliser cette application.");
           return;
         }
-
+        
         // Vérifier si l'environnement est en cours d'exécution
         const isRunning = await invoke<boolean>("check_environment_status");
         setIsEnvironmentRunning(isRunning);
-
+        
         // Si une configuration existe
         const configExists = await invoke<boolean>("check_config_exists");
         
@@ -92,7 +93,7 @@ function App() {
             await invoke("start_environment");
           }
           setIsEnvironmentRunning(true);
-          setStatusMessage("Environnement démarré avec succès");
+          setStatusMessage("Environnement Docker démarré avec succès");
         }
       } catch (error) {
         console.error("Error during startup:", error);
@@ -101,7 +102,7 @@ function App() {
     };
 
     checkDockerAndStart();
-
+    
     // Ajouter un gestionnaire pour nettoyer l'environnement à la fermeture
     const handleBeforeUnload = () => {
       // Utiliser une requête synchrone pour s'assurer que c'est exécuté avant la fermeture
@@ -196,33 +197,33 @@ function App() {
 
   const handleStartEnvironment = async () => {
     try {
-      setStatusMessage("Starting environment...");
+      setStatusMessage("Démarrage de l'environnement Docker...");
       await invoke<string>("start_environment");
       setIsEnvironmentRunning(true);
-      setStatusMessage("Environment started successfully");
+      setStatusMessage("Environnement Docker démarré avec succès");
     } catch (error) {
-      setStatusMessage(`Error starting environment: ${error}`);
+      setStatusMessage(`Erreur lors du démarrage de l'environnement: ${error}`);
     }
   };
 
   const handleStopEnvironment = async () => {
     try {
-      setStatusMessage("Stopping environment...");
+      setStatusMessage("Arrêt de l'environnement Docker...");
       await invoke<string>("stop_environment");
       setIsEnvironmentRunning(false);
-      setStatusMessage("Environment stopped successfully");
+      setStatusMessage("Environnement Docker arrêté avec succès");
     } catch (error) {
-      setStatusMessage(`Error stopping environment: ${error}`);
+      setStatusMessage(`Erreur lors de l'arrêt de l'environnement: ${error}`);
     }
   };
 
   const handleGenerateConfig = async () => {
     try {
       const config = await invoke<string>("generate_docker_compose");
-      setStatusMessage("Configuration generated successfully");
+      setStatusMessage("Configuration Docker générée avec succès");
       return config;
     } catch (error) {
-      setStatusMessage(`Error generating configuration: ${error}`);
+      setStatusMessage(`Erreur lors de la génération de la configuration: ${error}`);
       return null;
     }
   };
