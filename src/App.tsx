@@ -4,6 +4,7 @@ import { HomeView } from "./views/HomeView";
 import { ProjectsView } from "./views/ProjectsView";
 import { ServicesView } from "./views/ServicesView";
 import { ConfigView } from "./views/ConfigView";
+import { DockerInstallView } from "./views/DockerInstallView";
 import { Sidebar } from "../src/components/Sidebar";
 import "./App.css";
 
@@ -11,7 +12,8 @@ enum View {
   Home,
   Projects,
   Services,
-  Config
+  Config,
+  DockerInstall
 }
 
 interface Project {
@@ -71,8 +73,7 @@ function App() {
         setIsDockerInstalled(dockerInstalled);
         
         if (!dockerInstalled) {
-          setCurrentView(View.Config);
-          setStatusMessage("Docker n'est pas installé sur votre système. Veuillez installer Docker pour utiliser cette application.");
+          setCurrentView(View.DockerInstall);
           return;
         }
         
@@ -241,56 +242,62 @@ function App() {
 
   return (
     <div className="app-container">
-      <Sidebar
-        currentView={currentView}
-        onSelectView={setCurrentView}
-        isEnvironmentRunning={isEnvironmentRunning}
-        onStartEnvironment={handleStartEnvironment}
-        onStopEnvironment={handleStopEnvironment}
-      />
-      <div className="content">
-        {statusMessage && (
-          <div className="status-message">
-            {statusMessage}
-            <button onClick={() => setStatusMessage("")}>×</button>
-          </div>
-        )}
-
-        {currentView === View.Home && (
-          <HomeView 
-            projects={projects}
-            services={services}
+      {isDockerInstalled ? (
+        <>
+          <Sidebar
+            currentView={currentView}
+            onSelectView={setCurrentView}
             isEnvironmentRunning={isEnvironmentRunning}
+            onStartEnvironment={handleStartEnvironment}
+            onStopEnvironment={handleStopEnvironment}
           />
-        )}
+          <div className="content">
+            {statusMessage && (
+              <div className="status-message">
+                {statusMessage}
+                <button onClick={() => setStatusMessage("")}>×</button>
+              </div>
+            )}
 
-        {currentView === View.Projects && (
-          <ProjectsView
-            projects={projects}
-            services={services}
-            onAddProject={handleAddProject}
-            onUpdateProject={handleUpdateProject}
-            onRemoveProject={handleRemoveProject}
-            onAddServiceToProject={handleAddServiceToProject}
-            onRemoveServiceFromProject={handleRemoveServiceFromProject}
-          />
-        )}
+            {currentView === View.Home && (
+              <HomeView 
+                projects={projects}
+                services={services}
+                isEnvironmentRunning={isEnvironmentRunning}
+              />
+            )}
 
-        {currentView === View.Services && (
-          <ServicesView
-            onUpdateService={handleUpdateService}
-            services={services}
-            onAddService={handleAddService}
-            onRemoveService={handleRemoveService}
-          />
-        )}
+            {currentView === View.Projects && (
+              <ProjectsView
+                projects={projects}
+                services={services}
+                onAddProject={handleAddProject}
+                onUpdateProject={handleUpdateProject}
+                onRemoveProject={handleRemoveProject}
+                onAddServiceToProject={handleAddServiceToProject}
+                onRemoveServiceFromProject={handleRemoveServiceFromProject}
+              />
+            )}
 
-        {currentView === View.Config && (
-          <ConfigView
-            onGenerateConfig={handleGenerateConfig}
-          />
-        )}
-      </div>
+            {currentView === View.Services && (
+              <ServicesView
+                onUpdateService={handleUpdateService}
+                services={services}
+                onAddService={handleAddService}
+                onRemoveService={handleRemoveService}
+              />
+            )}
+
+            {currentView === View.Config && (
+              <ConfigView
+                onGenerateConfig={handleGenerateConfig}
+              />
+            )}
+          </div>
+        </>
+      ) : (
+        <DockerInstallView />
+      )}
     </div>
   );
 }

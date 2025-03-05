@@ -2,6 +2,18 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SystemInfo {
+    os_type: String,
+    os_version: String,
+    hostname: String,
+    cpu_info: String,
+    memory_total: u64,
+    docker_version: Option<String>,
+    docker_compose_version: Option<String>,
+}
 
 pub fn normalize_slug(input: &str) -> String {
     // Convertir en minuscules
@@ -102,7 +114,7 @@ pub fn is_docker_running() -> Result<bool, String> {
 pub fn is_environment_running() -> Result<bool, String> {
     let docker_compose_path = get_docker_compose_dir()?.join("docker-compose.yml");
 
-    if !docker_compose_path.exists() {
+    if (!docker_compose_path.exists()) {
         return Ok(false);
     }
 
@@ -289,12 +301,33 @@ pub fn create_nginx_config(project_name: &str) -> Result<PathBuf, String> {
 }
 
 pub fn is_docker_installed() -> Result<bool, String> {
-    let output = std::process::Command::new("sh")
-        .args(["-c", "which docker"])
-        .output()
-        .map_err(|e| format!("Failed to check docker installation: {}", e))?;
-
-    Ok(output.status.success())
+    #[cfg(target_os = "windows")]
+    {
+        let output = Command::new("where")
+            .args(["docker"])
+            .output()
+            .map_err(|e| format!("Failed to check docker installation: {}", e))?;
+        
+        Ok(output.status.success())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let output = Command::new("sh")
+            .args(["-c", "which docker"])
+            .output()
+            .map_err(|e| format!("Failed to check docker installation: {}", e))?;
+        
+        Ok(output.status.success())
+    }
+    #[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+    {
+        let output = Command::new("sh")
+            .args(["-c", "which docker"])
+            .output()
+            .map_err(|e| format!("Failed to check docker installation: {}", e))?;
+        
+        Ok(output.status.success())
+    }
 }
 
 pub fn restart_environment(_: &str) -> Result<(), String> {
@@ -315,4 +348,162 @@ pub fn restart_environment(_: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to start environment: {}", e))?;
 
     Ok(())
+}
+
+pub fn get_system_info() -> Result<SystemInfo, String> {
+    let mut system_info = SystemInfo {
+        os_type: std::env::consts::OS.to_string(),
+        os_version: "Unknown".to_string(),
+        hostname: "Unknown".to_string(),
+        cpu_info: "Unknown".to_string(),
+        memory_total: 0,
+        docker_version: None,
+        docker_compose_version: None,
+    };
+
+    // Récupérer le nom d'hôte
+    if let Ok(hostname_output) = Command::new("hostname").output() {
+        if hostname_output.status.success() {
+            if let Ok(hostname) = String::from_utf8(hostname_output.stdout) {
+                system_info.hostname = hostname.trim().to_string();
+            }
+        }
+    }
+
+    // OS Version spécifique selon le système
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(os_release) = fs::read_to_string("/etc/os-release") {
+            if let Some(name_line) = os_release.lines().find(|l| l.starts_with("PRETTY_NAME=")) {
+                if let Some(name) = name_line.strip_prefix("PRETTY_NAME=") {
+                    // Enlever les guillemets potentiels
+                    system_info.os_version = name.trim_matches('"').to_string();
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = Command::new("sw_vers").args(["-productVersion"]).output() {
+            if output.status.success() {
+                if let Ok(version) = String::from_utf8(output.stdout) {
+                    system_info.os_version = format!("macOS {}", version.trim());
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(output) = Command::new("cmd").args(["/C", "ver"]).output() {
+            if output.status.success() {
+                if let Ok(version) = String::from_utf8(output.stdout) {
+                    system_info.os_version = version.trim().to_string();
+                }
+            }
+        }
+    }
+
+    // Informations CPU
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(cpuinfo) = fs::read_to_string("/proc/cpuinfo") {
+            if let Some(model_line) = cpuinfo.lines().find(|l| l.starts_with("model name")) {
+                if let Some(model) = model_line.split(':').nth(1) {
+                    system_info.cpu_info = model.trim().to_string();
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = Command::new("sysctl").args(["-n", "machdep.cpu.brand_string"]).output() {
+            if output.status.success() {
+                if let Ok(cpu) = String::from_utf8(output.stdout) {
+                    system_info.cpu_info = cpu.trim().to_string();
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(output) = Command::new("wmic").args(["cpu", "get", "name"]).output() {
+            if output.status.success() {
+                if let Ok(cpu) = String::from_utf8(output.stdout) {
+                    let lines: Vec<&str> = cpu.lines().collect();
+                    if lines.len() >= 2 {
+                        system_info.cpu_info = lines[1].trim().to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    // Mémoire totale
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(meminfo) = fs::read_to_string("/proc/meminfo") {
+            if let Some(mem_line) = meminfo.lines().find(|l| l.starts_with("MemTotal:")) {
+                if let Some(mem_kb_str) = mem_line.split(':').nth(1) {
+                    if let Some(mem_kb_str) = mem_kb_str.trim().split(' ').next() {
+                        if let Ok(mem_kb) = mem_kb_str.parse::<u64>() {
+                            system_info.memory_total = mem_kb * 1024; // Convertir en octets
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if let Ok(output) = Command::new("sysctl").args(["-n", "hw.memsize"]).output() {
+            if output.status.success() {
+                if let Ok(mem) = String::from_utf8(output.stdout) {
+                    if let Ok(mem_bytes) = mem.trim().parse::<u64>() {
+                        system_info.memory_total = mem_bytes;
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(output) = Command::new("wmic").args(["computersystem", "get", "totalphysicalmemory"]).output() {
+            if output.status.success() {
+                if let Ok(mem) = String::from_utf8(output.stdout) {
+                    let lines: Vec<&str> = mem.lines().collect();
+                    if lines.len() >= 2 {
+                        if let Ok(mem_bytes) = lines[1].trim().parse::<u64>() {
+                            system_info.memory_total = mem_bytes;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Version de Docker
+    if let Ok(output) = Command::new("docker").args(["--version"]).output() {
+        if output.status.success() {
+            if let Ok(docker_ver) = String::from_utf8(output.stdout) {
+                system_info.docker_version = Some(docker_ver.trim().to_string());
+            }
+        }
+    }
+
+    // Version de Docker Compose
+    if let Ok(output) = Command::new("docker-compose").args(["--version"]).output() {
+        if output.status.success() {
+            if let Ok(compose_ver) = String::from_utf8(output.stdout) {
+                system_info.docker_compose_version = Some(compose_ver.trim().to_string());
+            }
+        }
+    }
+
+    Ok(system_info)
 }

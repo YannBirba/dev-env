@@ -2,6 +2,16 @@ import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./ConfigView.css";
 
+interface SystemInfo {
+  os_type: string;
+  os_version: string;
+  hostname: string;
+  cpu_info: string;
+  memory_total: number;
+  docker_version: string | null;
+  docker_compose_version: string | null;
+}
+
 interface ConfigViewProps {
   onGenerateConfig: () => Promise<string | null>;
 }
@@ -11,6 +21,8 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ onGenerateConfig }) => {
   const [loading, setLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
   const [configExists, setConfigExists] = useState<boolean>(false);
+  const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
+  const [systemInfoLoading, setSystemInfoLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const checkConfig = async () => {
@@ -18,7 +30,20 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ onGenerateConfig }) => {
       setConfigExists(exists);
     };
     
+    const fetchSystemInfo = async () => {
+      try {
+        setSystemInfoLoading(true);
+        const info = await invoke<SystemInfo>("get_system_info");
+        setSystemInfo(info);
+      } catch (error) {
+        console.error("Error fetching system information:", error);
+      } finally {
+        setSystemInfoLoading(false);
+      }
+    };
+    
     checkConfig();
+    fetchSystemInfo();
   }, []);
 
   const handleGenerateConfig = async () => {
@@ -61,6 +86,17 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ onGenerateConfig }) => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+
+  // Fonction pour formater la taille de la mémoire
+  const formatMemorySize = (bytes: number): string => {
+    if (bytes === 0) return "0 Bytes";
+    
+    const k = 1024;
+    const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
   return (
@@ -132,6 +168,64 @@ export const ConfigView: React.FC<ConfigViewProps> = ({ onGenerateConfig }) => {
               <li>Utiliser le bouton "Démarrer l'Environnement" dans l'onglet Services pour déployer automatiquement</li>
             </ol>
           </div>
+        </section>
+
+        <section className="step system-info-section">
+          <h2>3. Informations Système</h2>
+          {systemInfoLoading ? (
+            <div className="system-info-loading">
+              <p>Chargement des informations système...</p>
+              <div className="spinner"></div>
+            </div>
+          ) : systemInfo ? (
+            <div className="system-info">
+              <div className="system-info-card">
+                <h3>Système d'exploitation</h3>
+                <div className="system-info-content">
+                  <span className="system-info-label">Type :</span> 
+                  <span className="system-info-value">{systemInfo.os_type}</span>
+                </div>
+                <div className="system-info-content">
+                  <span className="system-info-label">Version :</span> 
+                  <span className="system-info-value">{systemInfo.os_version}</span>
+                </div>
+                <div className="system-info-content">
+                  <span className="system-info-label">Nom d'hôte :</span> 
+                  <span className="system-info-value">{systemInfo.hostname}</span>
+                </div>
+              </div>
+
+              <div className="system-info-card">
+                <h3>Matériel</h3>
+                <div className="system-info-content">
+                  <span className="system-info-label">Processeur :</span> 
+                  <span className="system-info-value">{systemInfo.cpu_info}</span>
+                </div>
+                <div className="system-info-content">
+                  <span className="system-info-label">Mémoire :</span> 
+                  <span className="system-info-value">{formatMemorySize(systemInfo.memory_total)}</span>
+                </div>
+              </div>
+
+              <div className="system-info-card">
+                <h3>Docker</h3>
+                <div className="system-info-content">
+                  <span className="system-info-label">Docker :</span> 
+                  <span className="system-info-value">
+                    {systemInfo.docker_version || "Non disponible"}
+                  </span>
+                </div>
+                <div className="system-info-content">
+                  <span className="system-info-label">Docker Compose :</span> 
+                  <span className="system-info-value">
+                    {systemInfo.docker_compose_version || "Non disponible"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p>Impossible de récupérer les informations système.</p>
+          )}
         </section>
       </div>
     </div>

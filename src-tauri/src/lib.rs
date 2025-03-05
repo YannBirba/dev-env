@@ -371,6 +371,11 @@ fn reset_config() -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn get_system_info() -> Result<system::SystemInfo, String> {
+    system::get_system_info()
+}
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -608,6 +613,7 @@ pub fn run() -> tauri::App {
             add_predefined_service,
             reset_config,
             is_docker_installed,
+            get_system_info,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

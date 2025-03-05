@@ -6,7 +6,8 @@ enum View {
   Home,
   Projects,
   Services,
-  Config
+  Config,
+  DockerInstall
 }
 
 interface SidebarProps {

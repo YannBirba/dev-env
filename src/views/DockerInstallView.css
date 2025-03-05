@@ -1,0 +1,225 @@
+.docker-install-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  color: #333;
+}
+
+.docker-install-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.docker-install-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 1rem;
+  color: #2496ed; /* Docker blue */
+  animation: fadeIn 1s ease-out;
+}
+
+.subtitle {
+  font-size: 1.2rem;
+  color: #666;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.platforms-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.platform-card {
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  height: 100%;
+  position: relative;
+}
+
+.platform-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* Style pour la carte correspondant au système d'exploitation de l'utilisateur */
+.platform-card.current-os {
+  box-shadow: 0 8px 24px rgba(36, 150, 237, 0.25);
+  border: 2px solid #2496ed;
+  order: -1; /* Assure que la carte apparaît en premier sur les petits écrans */
+  transform: scale(1.02);
+}
+
+.platform-card.current-os:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 12px 28px rgba(36, 150, 237, 0.35);
+}
+
+.platform-header {
+  background-color: #2496ed;
+  color: white;
+  padding: 1.5rem;
+  text-align: center;
+  position: relative;
+}
+
+.platform-header h2 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.current-os-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #ffcc00;
+  color: #333;
+  font-size: 0.8rem;
+  font-weight: bold;
+  padding: 0.3rem 0.6rem;
+  border-radius: 0 0 0 8px;
+  box-shadow: -2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.platform-content {
+  padding: 1.5rem;
+}
+
+.platform-content h3 {
+  margin-top: 0;
+  color: #2496ed;
+  border-bottom: 1px solid #eaeaea;
+  padding-bottom: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.platform-content ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.platform-content li {
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.platform-content a {
+  color: #2496ed;
+  text-decoration: none;
+  font-weight: 500;
+  border-bottom: 1px dotted #2496ed;
+}
+
+.platform-content a:hover {
+  color: #1d7ebf;
+  border-bottom-style: solid;
+}
+
+.platform-note {
+  background-color: #f0f7ff;
+  border-left: 4px solid #2496ed;
+  padding: 1rem;
+  margin-top: 1.5rem;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.9rem;
+}
+
+.platform-note strong {
+  color: #2496ed;
+}
+
+pre {
+  background-color: #f7f9fb;
+  border-radius: 6px;
+  padding: 1rem;
+  overflow-x: auto;
+  font-size: 0.9rem;
+  margin: 1rem 0;
+  border: 1px solid #e1e4e8;
+}
+
+code {
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  color: #333;
+}
+
+.docker-install-footer {
+  text-align: center;
+  background-color: #f7f9fb;
+  padding: 2rem;
+  border-radius: 10px;
+  margin-top: 1rem;
+}
+
+.verification-tip {
+  max-width: 600px;
+  margin: 2rem auto 0;
+  text-align: left;
+  background-color: #fff;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.verification-tip h3 {
+  color: #2496ed;
+  margin-top: 0;
+}
+
+.verification-tip pre {
+  margin: 1rem 0;
+}
+
+/* Style pour l'état de chargement */
+.docker-install-container.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 80vh;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  border: 5px solid rgba(36, 150, 237, 0.2);
+  border-radius: 50%;
+  border-top-color: #2496ed;
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 1.5rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 768px) {
+  .platforms-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .docker-install-container {
+    padding: 1rem;
+  }
+  
+  .docker-install-header h1 {
+    font-size: 2rem;
+  }
+}
