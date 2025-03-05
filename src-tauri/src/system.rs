@@ -114,7 +114,7 @@ pub fn is_docker_running() -> Result<bool, String> {
 pub fn is_environment_running() -> Result<bool, String> {
     let docker_compose_path = get_docker_compose_dir()?.join("docker-compose.yml");
 
-    if (!docker_compose_path.exists()) {
+    if !docker_compose_path.exists() {
         return Ok(false);
     }
 
